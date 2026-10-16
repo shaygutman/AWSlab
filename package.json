@@ -1,0 +1,7 @@
+{
+  "name": "automation-site",
+  "private": true,
+  "devDependencies": {
+    "serverless": "^3.40.0"
+  }
+}

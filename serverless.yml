@@ -1,0 +1,77 @@
+service: automation-site
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: prod
+  architecture: x86_64
+  environment:
+    GAMES_TABLE: ${self:service}-${sls:stage}-games
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+          Resource:
+            - Fn::GetAtt: [GamesTable, Arn]
+
+package:
+  patterns:
+    - "!**"
+    - handler.py
+    - game.py
+    - game.html
+    - wordle.py
+
+functions:
+  site:
+    handler: handler.page
+    description: Serves the AutomationEC2instance home page
+    events:
+      - httpApi:
+          path: /
+          method: GET
+  gamePage:
+    handler: game.page
+    description: Serves the Word Guess game page
+    events:
+      - httpApi:
+          path: /game
+          method: GET
+  newGame:
+    handler: game.new_game
+    description: Starts a Word Guess game
+    events:
+      - httpApi:
+          path: /api/new
+          method: POST
+  guess:
+    handler: game.guess
+    description: Checks a Word Guess guess
+    events:
+      - httpApi:
+          path: /api/guess
+          method: POST
+
+resources:
+  Resources:
+    GamesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.GAMES_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: gameId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: gameId
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true

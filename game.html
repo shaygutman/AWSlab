@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spivak If you get bored, here is one game to pass the time on the flight or in South Africa.</title>
+<style>
+  :root {
+    --correct: #538d4e;
+    --present: #b59f3b;
+    --absent: #3a3a3c;
+    --empty: #121213;
+    --border: #3a3a3c;
+    --key: #818384;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--empty);
+    color: #fff;
+    font-family: "Segoe UI", Arial, sans-serif;
+  }
+  header {
+    width: 100%;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    padding: 12px 0;
+  }
+  h1 {
+    margin: 0 auto;
+    max-width: 760px;
+    padding: 0 16px;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0;
+  }
+  header a { color: #aaa; font-size: 13px; }
+  #message {
+    min-height: 28px;
+    margin: 14px 0 6px;
+    font-weight: 600;
+    text-align: center;
+  }
+  #board {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .tile {
+    width: 58px;
+    height: 58px;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .tile.filled { border-color: #565758; }
+  .tile.correct, .key.correct { background: var(--correct); border-color: var(--correct); }
+  .tile.present, .key.present { background: var(--present); border-color: var(--present); }
+  .tile.absent, .key.absent { background: var(--absent); border-color: var(--absent); }
+  #keyboard { width: 100%; max-width: 500px; padding: 0 6px 18px; }
+  .key-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 8px; }
+  .key {
+    flex: 1;
+    height: 56px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--key);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .key.wide { flex: 1.5; font-size: 12px; }
+  #newGame {
+    margin: 0 0 18px;
+    padding: 10px 22px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--correct);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: wait; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Spivak If you get bored, here is one game to pass the time on the flight or in South Africa.</h1>
+  <a href="./">Home</a>
+</header>
+<div id="message">Guess the 5-letter word in 6 tries.</div>
+<div id="board"></div>
+<button id="newGame" type="button">New game</button>
+<div id="keyboard"></div>
+
+<script>
+  const WORD_LENGTH = 5;
+  const MAX_GUESSES = 6;
+  const RANK = { absent: 1, present: 2, correct: 3 };
+
+  const board = document.getElementById("board");
+  const keyboard = document.getElementById("keyboard");
+  const message = document.getElementById("message");
+  const newGameButton = document.getElementById("newGame");
+
+  let gameId = null;
+  let row = 0;
+  let current = "";
+  let busy = false;
+  let over = false;
+  const keyState = {};
+
+  function buildBoard() {
+    board.innerHTML = "";
+    for (let r = 0; r < MAX_GUESSES; r++) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "row";
+      for (let c = 0; c < WORD_LENGTH; c++) {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        rowEl.appendChild(tile);
+      }
+      board.appendChild(rowEl);
+    }
+  }
+
+  function buildKeyboard() {
+    keyboard.innerHTML = "";
+    const rows = ["qwertyuiop", "asdfghjkl", "+zxcvbnm-"];
+    for (const letters of rows) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "key-row";
+      for (const ch of letters) {
+        const key = document.createElement("button");
+        key.type = "button";
+        key.className = "key";
+        if (ch === "+") {
+          key.textContent = "Enter";
+          key.classList.add("wide");
+          key.dataset.key = "Enter";
+        } else if (ch === "-") {
+          key.textContent = "Del";
+          key.classList.add("wide");
+          key.dataset.key = "Backspace";
+        } else {
+          key.textContent = ch;
+          key.dataset.key = ch;
+          key.dataset.letter = ch;
+        }
+        rowEl.appendChild(key);
+      }
+      keyboard.appendChild(rowEl);
+    }
+  }
+
+  function tiles(r) {
+    return board.children[r].children;
+  }
+
+  function drawCurrent() {
+    const rowTiles = tiles(row);
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      rowTiles[c].textContent = current[c] || "";
+      rowTiles[c].classList.toggle("filled", Boolean(current[c]));
+    }
+  }
+
+  function paintRow(r, word, result) {
+    const rowTiles = tiles(r);
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      rowTiles[c].textContent = word[c];
+      rowTiles[c].classList.add(result[c]);
+      const letter = word[c];
+      if (!keyState[letter] || RANK[result[c]] > RANK[keyState[letter]]) {
+        keyState[letter] = result[c];
+      }
+    }
+    for (const key of keyboard.querySelectorAll("[data-letter]")) {
+      const state = keyState[key.dataset.letter];
+      key.classList.remove("correct", "present", "absent");
+      if (state) key.classList.add(state);
+    }
+  }
+
+  async function api(path, body) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Something went wrong.");
+    return data;
+  }
+
+  async function startGame() {
+    busy = true;
+    newGameButton.disabled = true;
+    message.textContent = "Starting a new game...";
+    try {
+      const data = await api("api/new");
+      gameId = data.gameId;
+      row = 0;
+      current = "";
+      over = false;
+      for (const letter in keyState) delete keyState[letter];
+      buildBoard();
+      buildKeyboard();
+      message.textContent = "Guess the 5-letter word in 6 tries.";
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      busy = false;
+      newGameButton.disabled = false;
+    }
+  }
+
+  async function submitGuess() {
+    if (current.length !== WORD_LENGTH) {
+      message.textContent = "Not enough letters.";
+      return;
+    }
+    busy = true;
+    try {
+      const data = await api("api/guess", { gameId, guess: current });
+      paintRow(row, data.guess, data.result);
+      row++;
+      current = "";
+      if (data.status === "won") {
+        over = true;
+        message.textContent = "You got it! The word was " + data.answer.toUpperCase() + ".";
+      } else if (data.status === "lost") {
+        over = true;
+        message.textContent = "Out of tries. The word was " + data.answer.toUpperCase() + ".";
+      } else {
+        message.textContent = data.remaining + (data.remaining === 1 ? " try" : " tries") + " left.";
+      }
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      busy = false;
+    }
+  }
+
+  function handleKey(key) {
+    if (busy || over || !gameId) return;
+    if (key === "Enter") {
+      submitGuess();
+    } else if (key === "Backspace") {
+      current = current.slice(0, -1);
+      drawCurrent();
+    } else if (/^[a-z]$/i.test(key) && current.length < WORD_LENGTH) {
+      current += key.toLowerCase();
+      drawCurrent();
+    }
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    handleKey(event.key);
+  });
+
+  keyboard.addEventListener("click", (event) => {
+    const key = event.target.closest("[data-key]");
+    if (key) {
+      handleKey(key.dataset.key);
+      key.blur();
+    }
+  });
+
+  newGameButton.addEventListener("click", () => {
+    newGameButton.blur();
+    startGame();
+  });
+
+  buildBoard();
+  buildKeyboard();
+  startGame();
+</script>
+</body>
+</html>

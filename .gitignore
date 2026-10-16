@@ -1,0 +1,10 @@
+*.pem
+RSAkey123.pem
+node_modules/
+.serverless/
+__pycache__/
+*.pyc
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
